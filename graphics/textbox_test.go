@@ -21,6 +21,34 @@ import (
 	"testing"
 )
 
+func TestTextBox_SplitLines(t *testing.T) {
+	given := []rune("This\r\nis\na\r\ntest\n")
+	expected := [][]rune{
+		[]rune("This"),
+		[]rune("is"),
+		[]rune("a"),
+		[]rune("test"),
+	}
+	actual := graphics.SplitLines(given)
+	if len(actual) != len(expected) {
+		t.Errorf("Incorrect line count; expected '%d', got '%d'", len(expected), len(actual))
+	} else {
+		for i := 0; i < len(expected); i++ {
+			a := actual[i]
+			e := expected[i]
+			if len(a) != len(e) {
+				t.Errorf("Incorrect line length; expected '%d', got '%d'", len(e), len(a))
+			} else {
+				for j := range e {
+					if a[j] != e[j] {
+						t.Errorf("Incorrect splitting; expected '%c', got '%c'", e[j], a[j])
+					}
+				}
+			}
+		}
+	}
+}
+
 func TestTextBox_PDFEscapeString(t *testing.T) {
 	given := []rune("ATTACK) Tj\n\nET")
 	expected := "ATTACK\\) Tj\n\nET"

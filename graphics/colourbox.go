@@ -46,8 +46,8 @@ func (b *ColourBox) Write(p *pdfgo.PDF, buffer *bytes.Buffer) error {
 	// Border
 	if b.BorderColour != nil {
 		buffer.WriteString(fmt.Sprintf("%s %s %s RG\n", FloatToString(b.BorderColour[0]), FloatToString(b.BorderColour[1]), FloatToString(b.BorderColour[2])))
-		buffer.WriteString(fmt.Sprintf("%s %s %s %s re B\n", FloatToString(b.Left), FloatToString(b.Bottom), FloatToString(b.GetWidth()), FloatToString(b.GetHeight())))
+		buffer.WriteString(fmt.Sprintf("%s %s %s %s re S\n", FloatToString(b.Left), FloatToString(b.Bottom), FloatToString(b.GetWidth()), FloatToString(b.GetHeight())))
 	}
-	buffer.WriteString("Q\n")
+	buffer.WriteString("Q")
 	return nil
 }

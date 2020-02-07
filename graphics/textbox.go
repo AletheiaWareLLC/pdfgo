@@ -288,7 +288,7 @@ func (b *TextBox) Write(p *pdfgo.PDF, buffer *bytes.Buffer) error {
 			buffer.WriteString(fmt.Sprintf("(%s) '\n", l.Text))
 		}
 	}
-	buffer.WriteString("ET\nQ\n")
+	buffer.WriteString("ET\nQ")
 	return nil
 }
 
@@ -297,6 +297,15 @@ func SplitLines(text []rune) [][]rune {
 	var line []rune
 	for i := 0; i < len(text); i++ {
 		c := text[i]
+		if c == '\r' {
+			// Ignore Carriage Return unless followed by New Line
+			i++
+			if i < len(text) {
+				c = text[i]
+			} else {
+				break
+			}
+		}
 		if c == '\n' {
 			lines = append(lines, line)
 			line = nil

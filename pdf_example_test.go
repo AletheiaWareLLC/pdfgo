@@ -17,7 +17,11 @@
 package pdfgo_test
 
 import (
+	"bytes"
 	"github.com/AletheiaWareLLC/pdfgo"
+	"github.com/AletheiaWareLLC/pdfgo/font"
+	"github.com/AletheiaWareLLC/pdfgo/graphics"
+	"log"
 	"os"
 )
 
@@ -78,6 +82,65 @@ func ExamplePDF_hyperlink() {
 	// trailer <</Size 5 /Root 1 0 R>>
 	// startxref
 	// 369
+	// %%EOF
+}
+
+func ExamplePDF_stream_colourbox() {
+	p := pdfgo.NewPDF()
+
+	box := &graphics.ColourBox{
+		BorderColour: []float64{1.0, 0.0, 0.0},
+		FillColour:   []float64{0.0, 0.0, 1.0},
+	}
+
+	if err := box.SetBounds(&graphics.Rectangle{
+		Left:   50,
+		Right:  350,
+		Top:    550,
+		Bottom: 50,
+	}); err != nil {
+		log.Fatal(err)
+	}
+
+	var buffer bytes.Buffer
+	if err := box.Write(p, &buffer); err != nil {
+		log.Fatal(err)
+	}
+	contents := p.NewStreamObject()
+	contents.Data = buffer.Bytes()
+
+	// Create Page
+	width := 400.0
+	height := 600.0
+	p.AddPage(width, height, nil, pdfgo.NewObjectReference(contents))
+
+	// Write to Standard Out
+	p.Write(os.Stdout)
+
+	// Output:
+	// %PDF-1.7
+	// 1 0 obj <</Type /Catalog /Pages 2 0 R>> endobj
+	// 2 0 obj <</Type /Pages /Kids [4 0 R] /Count 1>> endobj
+	// 3 0 obj <</Length 59>>
+	// stream
+	// q
+	// 0 0 1 rg
+	// 50 50 300 500 re f
+	// 1 0 0 RG
+	// 50 50 300 500 re S
+	// Q
+	// endstream endobj
+	// 4 0 obj <</Type /Page /Parent 2 0 R /MediaBox [0 0 400 600] /Annots [] /Contents 3 0 R>> endobj
+	// xref
+	// 0 5
+	// 0000000000 65535 f
+	// 0000000009 00000 n
+	// 0000000056 00000 n
+	// 0000000111 00000 n
+	// 0000000218 00000 n
+	// trailer <</Size 5 /Root 1 0 R>>
+	// startxref
+	// 314
 	// %%EOF
 }
 
@@ -165,16 +228,16 @@ func ExamplePDF_stream_text() {
 	p := pdfgo.NewPDF()
 
 	// Create Font
-	f1 := p.NewDictionaryObject()
-	f1.AddNameNameEntry("Type", "Font")
-	f1.AddNameNameEntry("Subtype", "Type1")
-	f1.AddNameNameEntry("BaseFont", "Helvetica")
-	font := p.NewDictionaryObject()
-	font.AddNameObjectEntry("F1", pdfgo.NewObjectReference(f1))
+	f1, err := font.NewCoreFont(p, "Helvetica")
+	if err != nil {
+		log.Fatal(err)
+	}
+	fonts := p.NewDictionaryObject()
+	fonts.AddNameObjectEntry("F1", f1.GetReference())
 
 	// Create Resources
 	resources := p.NewDictionaryObject()
-	resources.AddNameObjectEntry("Font", pdfgo.NewObjectReference(font))
+	resources.AddNameObjectEntry("Font", pdfgo.NewObjectReference(fonts))
 
 	// Create Stream to Display "Hello World!"
 	contents := p.NewStreamObject()
@@ -192,7 +255,7 @@ func ExamplePDF_stream_text() {
 	// %PDF-1.7
 	// 1 0 obj <</Type /Catalog /Pages 2 0 R>> endobj
 	// 2 0 obj <</Type /Pages /Kids [7 0 R] /Count 1>> endobj
-	// 3 0 obj <</Type /Font /Subtype /Type1 /BaseFont /Helvetica>> endobj
+	// 3 0 obj <</Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding>> endobj
 	// 4 0 obj <</F1 3 0 R>> endobj
 	// 5 0 obj <</Font 4 0 R>> endobj
 	// 6 0 obj <</Length 44>>
@@ -210,12 +273,103 @@ func ExamplePDF_stream_text() {
 	// 0000000009 00000 n
 	// 0000000056 00000 n
 	// 0000000111 00000 n
-	// 0000000179 00000 n
-	// 0000000208 00000 n
-	// 0000000239 00000 n
-	// 0000000331 00000 n
+	// 0000000206 00000 n
+	// 0000000235 00000 n
+	// 0000000266 00000 n
+	// 0000000358 00000 n
 	// trailer <</Size 8 /Root 1 0 R>>
 	// startxref
-	// 444
+	// 471
+	// %%EOF
+}
+
+func ExamplePDF_stream_textbox() {
+	p := pdfgo.NewPDF()
+
+	// Create Font
+	f1, err := font.NewCoreFont(p, "Helvetica")
+	if err != nil {
+		log.Fatal(err)
+	}
+	fonts := p.NewDictionaryObject()
+	fonts.AddNameObjectEntry("F1", f1.GetReference())
+
+	// Create Resources
+	resources := p.NewDictionaryObject()
+	resources.AddNameObjectEntry("Font", pdfgo.NewObjectReference(fonts))
+
+	// Create Contents
+	box := &graphics.TextBox{
+		Text:       []rune("Hello World!"),
+		FontId:     "F1",
+		Font:       f1,
+		FontSize:   32,
+		FontColour: []float64{1.0, 0.0, 0.0},
+		Align:      graphics.Center,
+	}
+
+	if err := box.SetBounds(&graphics.Rectangle{
+		Left:   50,
+		Right:  350,
+		Top:    550,
+		Bottom: 50,
+	}); err != nil {
+		log.Fatal(err)
+	}
+
+	var buffer bytes.Buffer
+	if err := box.Write(p, &buffer); err != nil {
+		log.Fatal(err)
+	}
+	contents := p.NewStreamObject()
+	contents.Data = buffer.Bytes()
+
+	// Create Page
+	width := 400.0
+	height := 600.0
+	p.AddPage(width, height, pdfgo.NewObjectReference(resources), pdfgo.NewObjectReference(contents))
+
+	// Write to Standard Out
+	p.Write(os.Stdout)
+
+	// Output:
+	// %PDF-1.7
+	// 1 0 obj <</Type /Catalog /Pages 2 0 R>> endobj
+	// 2 0 obj <</Type /Pages /Kids [7 0 R] /Count 1>> endobj
+	// 3 0 obj <</Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding>> endobj
+	// 4 0 obj <</F1 3 0 R>> endobj
+	// 5 0 obj <</Font 4 0 R>> endobj
+	// 6 0 obj <</Length 121>>
+	// stream
+	// q
+	// BT
+	// /F1 32 Tf
+	// 1 0 0 rg
+	// 1 0 0 1 50 518 Tm
+	// 32 TL
+	// 0 Tc
+	// 0 Tw
+	// 100 Tz
+	// 63.760000000000005 0 Td
+	// 0 Ts
+	// 0 Tr
+	// (Hello World!) Tj
+	// ET
+	// Q
+	// endstream endobj
+	// 7 0 obj <</Type /Page /Parent 2 0 R /MediaBox [0 0 400 600] /Annots [] /Resources 5 0 R /Contents 6 0 R>> endobj
+	// xref
+	// 0 8
+	// 0000000000 65535 f
+	// 0000000009 00000 n
+	// 0000000056 00000 n
+	// 0000000111 00000 n
+	// 0000000206 00000 n
+	// 0000000235 00000 n
+	// 0000000266 00000 n
+	// 0000000436 00000 n
+	// trailer <</Size 8 /Root 1 0 R>>
+	// startxref
+	// 549
 	// %%EOF
 }
