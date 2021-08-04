@@ -75,39 +75,71 @@ func NewTrueTypeFont(p *pdfgo.PDF, file string) (*TrueTypeFont, error) {
 	font.AddNameNameEntry("Type", "Font")
 	font.AddNameNameEntry("Subtype", "TrueType")
 	font.AddNameNameEntry("BaseFont", basename)
+	// TODO font.AddNameNameEntry("Encoding", "") // "MacRomanEncoding" or "WinAnsiEncoding"
+	var (
+		end      int
+		widths   []pdfgo.Object
+		sum, max float64
+	)
+	scale := fixed.Int26_6(f.FUnitsPerEm())
+	for i := 32; i < 65536; i++ {
+		index := f.Index(rune(i))
+		if index == 0 {
+			continue
+		}
+		end = i
+		width := float64(f.HMetric(scale, index).AdvanceWidth)
+		sum += width
+		if width > max {
+			max = width
+		}
+		//log.Println(i, string(rune(i)), index, width)
+		widths = append(widths, &pdfgo.NumberObject{
+			Number: width,
+		})
+	}
 	font.AddNameObjectEntry("FirstChar", &pdfgo.NumberObject{
 		Number: 32,
 	})
 	font.AddNameObjectEntry("LastChar", &pdfgo.NumberObject{
-		Number: 255,
+		Number: float64(end),
 	})
-	font.AddNameNameEntry("Encoding", "") // "MacRomanEncoding" or "WinAnsiEncoding"
-	var widths []pdfgo.Object
-	/* TODO
-	   for i, w := range f.Widths {
-	       widths = append(widths, &pdfgo.NumberObject{Number: 0})
-	   }
-	*/
 	width := p.NewArrayObject(widths)
 	font.AddNameObjectEntry("Widths", pdfgo.NewObjectReference(width))
 	descriptor := p.NewDictionaryObject()
 	descriptor.AddNameNameEntry("Type", "FontDescriptor")
 	descriptor.AddNameNameEntry("FontName", basename)
-	/*
-	   descriptor.AddNameNameEntry("Ascent",)
-	   descriptor.AddNameNameEntry("Descent",)
-	   descriptor.AddNameNameEntry("CapHeight",)
-	   descriptor.AddNameNameEntry("Flags",)
-	   descriptor.AddNameNameEntry("FontBBox",)
-	   descriptor.AddNameNameEntry("ItalicAngle",)
-	   descriptor.AddNameNameEntry("Leading",)
-	   descriptor.AddNameNameEntry("StemV",)
-	   descriptor.AddNameNameEntry("StemH",)
-	   descriptor.AddNameNameEntry("AvgWidth",)
-	   descriptor.AddNameNameEntry("MaxWidth",)
-	   descriptor.AddNameNameEntry("MissingWidth",)
-	   descriptor.AddNameNameEntry("FontFile2", /Subtype "TrueType")
-	*/
+
+	// TODO descriptor.AddNameNameEntry("Ascent",)
+	// TODO descriptor.AddNameNameEntry("Descent",)
+	// TODO descriptor.AddNameNameEntry("CapHeight",)
+	// TODO descriptor.AddNameNameEntry("Flags", integer)
+	bounds := f.Bounds(scale)
+	descriptor.AddNameObjectEntry("FontBBox", &pdfgo.ArrayObject{
+		Array: []pdfgo.Object{
+			&pdfgo.NumberObject{Number: float64(bounds.Min.X)},
+			&pdfgo.NumberObject{Number: float64(bounds.Min.Y)},
+			&pdfgo.NumberObject{Number: float64(bounds.Max.X)},
+			&pdfgo.NumberObject{Number: float64(bounds.Max.Y)},
+		},
+	})
+	// TODO descriptor.AddNameNameEntry("ItalicAngle", integer)
+	// TODO descriptor.AddNameNameEntry("Leading",)
+	// TODO descriptor.AddNameNameEntry("StemV",)
+	// TODO descriptor.AddNameNameEntry("StemH",)
+	average := sum / (224)
+	descriptor.AddNameObjectEntry("AvgWidth", &pdfgo.NumberObject{
+		Number: average,
+	})
+	descriptor.AddNameObjectEntry("MaxWidth", &pdfgo.NumberObject{
+		Number: max,
+	})
+	descriptor.AddNameObjectEntry("MissingWidth", &pdfgo.NumberObject{
+		Number: average,
+	})
+	stream := p.NewStreamObject()
+	stream.Data = b
+	descriptor.AddNameObjectEntry("FontFile2", pdfgo.NewObjectReference(stream))
 	font.AddNameObjectEntry("FontDescriptor", pdfgo.NewObjectReference(descriptor))
 	return &TrueTypeFont{
 		Reference: pdfgo.NewObjectReference(font),
