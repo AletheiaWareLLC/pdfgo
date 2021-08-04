@@ -121,6 +121,7 @@ func (p *PDF) NewNumberObject(number float64) *NumberObject {
 
 func (p *PDF) NewStreamObject() *StreamObject {
 	o := &StreamObject{}
+	o.Dictionary = make(map[*NameObject]Object)
 	p.add(o)
 	return o
 }

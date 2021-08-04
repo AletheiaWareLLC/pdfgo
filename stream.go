@@ -19,14 +19,35 @@ package pdfgo
 import "io"
 
 type StreamObject struct {
-	Metadata
+	DictionaryObject
 	// TODO support encoding
 	Data []byte
 }
 
 func (o *StreamObject) Write(out io.Writer) (int, error) {
+	addKey := true
+	for k := range o.Dictionary {
+		if k.Name == "Length" {
+			addKey = false
+			break
+		}
+	}
+	key := &NameObject{
+		Name: "Length",
+	}
+	if addKey {
+		o.Keys = append(o.Keys, key)
+	}
+	o.Dictionary[key] = &NumberObject{
+		Number: float64(len(o.Data)),
+	}
 	var count int
-	n, err := WriteF(out, "<</Length %d>>\nstream\n", len(o.Data))
+	n, err := o.DictionaryObject.Write(out)
+	if err != nil {
+		return 0, err
+	}
+	count += n
+	n, err = WriteF(out, "\nstream\n")
 	if err != nil {
 		return 0, err
 	}
