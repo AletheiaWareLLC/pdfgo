@@ -17,7 +17,12 @@
 package pdfgo
 
 import (
+	"bytes"
 	"fmt"
+	"image/color"
+	"image/gif"
+	"image/jpeg"
+	"image/png"
 	"io"
 	"log"
 )
@@ -153,6 +158,77 @@ func (p *PDF) AddAnnotation(annotation Annotation) {
 		a.AddNameObjectEntry("Dest", annotation.GetDestination())
 	}
 	p.Annotations.Array = append(p.Annotations.Array, NewObjectReference(a))
+}
+
+func (p *PDF) AddImage(mime string, data []byte) (*ObjectReference, float64, float64, error) {
+	s := p.NewStreamObject()
+	s.Data = data
+	s.AddNameNameEntry("Type", "XObject")
+	s.AddNameNameEntry("Subtype", "Image")
+	var width, height float64
+	switch mime {
+	case "image/jpeg", "image/jpg":
+		config, err := jpeg.DecodeConfig(bytes.NewReader(data))
+		if err != nil {
+			return nil, 0, 0, err
+		}
+		width = float64(config.Width)
+		height = float64(config.Height)
+		s.AddNameNameEntry("Filter", "DCTDecode")
+		s.AddNameObjectEntry("BitsPerComponent", &NumberObject{
+			Number: float64(8),
+		})
+		switch config.ColorModel {
+		case color.GrayModel:
+			s.AddNameNameEntry("ColorSpace", "DeviceGray")
+		case color.YCbCrModel:
+			s.AddNameNameEntry("ColorSpace", "DeviceRGB")
+		case color.CMYKModel:
+			s.AddNameNameEntry("ColorSpace", "DeviceCMYK")
+		default:
+			return nil, 0, 0, fmt.Errorf("Unsupported JPG Color Model: %s\n", config.ColorModel)
+		}
+	case "image/gif":
+		// Convert GIF to PNG
+		img, err := gif.Decode(bytes.NewReader(data))
+		if err != nil {
+			return nil, 0, 0, err
+		}
+		var buffer bytes.Buffer
+		if err := png.Encode(&buffer, img); err != nil {
+			return nil, 0, 0, err
+		}
+		data = buffer.Bytes()
+		fallthrough
+	case "image/png":
+		config, err := png.DecodeConfig(bytes.NewReader(data))
+		if err != nil {
+			return nil, 0, 0, err
+		}
+		width = float64(config.Width)
+		height = float64(config.Height)
+		s.AddNameNameEntry("Filter", "FlateDecode")
+		s.AddNameObjectEntry("BitsPerComponent", &NumberObject{
+			Number: float64(8),
+		})
+		switch config.ColorModel {
+		case color.GrayModel:
+			s.AddNameNameEntry("ColorSpace", "DeviceGray")
+		case color.NRGBAModel, color.RGBAModel:
+			s.AddNameNameEntry("ColorSpace", "DeviceRGB")
+		default:
+			return nil, 0, 0, fmt.Errorf("Unsupported PNG Color Model: %s\n", config.ColorModel)
+		}
+	default:
+		return nil, 0, 0, fmt.Errorf("Unsupported Image Media Type: %s\n", mime)
+	}
+	s.AddNameObjectEntry("Width", &NumberObject{
+		Number: width,
+	})
+	s.AddNameObjectEntry("Height", &NumberObject{
+		Number: height,
+	})
+	return NewObjectReference(s), width, height, nil
 }
 
 func (p *PDF) Write(out io.Writer) error {
