@@ -28,12 +28,12 @@ type ColourBox struct {
 	FillColour   []float64
 }
 
-func (b *ColourBox) SetBounds(bounds *Rectangle) error {
+func (b *ColourBox) SetBounds(bounds *Rectangle) (*Rectangle, error) {
 	b.Left = bounds.Left
 	b.Top = bounds.Top
 	b.Right = bounds.Right
 	b.Bottom = bounds.Bottom
-	return nil
+	return bounds, nil
 }
 
 func (b *ColourBox) Write(p *pdfgo.PDF, buffer *bytes.Buffer) error {
@@ -41,12 +41,12 @@ func (b *ColourBox) Write(p *pdfgo.PDF, buffer *bytes.Buffer) error {
 	// Fill
 	if b.FillColour != nil {
 		buffer.WriteString(fmt.Sprintf("%s %s %s rg\n", FloatToString(b.FillColour[0]), FloatToString(b.FillColour[1]), FloatToString(b.FillColour[2])))
-		buffer.WriteString(fmt.Sprintf("%s %s %s %s re f\n", FloatToString(b.Left), FloatToString(b.Bottom), FloatToString(b.GetWidth()), FloatToString(b.GetHeight())))
+		buffer.WriteString(fmt.Sprintf("%s %s %s %s re f\n", FloatToString(b.Left), FloatToString(b.Bottom), FloatToString(b.DX()), FloatToString(b.DY())))
 	}
 	// Border
 	if b.BorderColour != nil {
 		buffer.WriteString(fmt.Sprintf("%s %s %s RG\n", FloatToString(b.BorderColour[0]), FloatToString(b.BorderColour[1]), FloatToString(b.BorderColour[2])))
-		buffer.WriteString(fmt.Sprintf("%s %s %s %s re S\n", FloatToString(b.Left), FloatToString(b.Bottom), FloatToString(b.GetWidth()), FloatToString(b.GetHeight())))
+		buffer.WriteString(fmt.Sprintf("%s %s %s %s re S\n", FloatToString(b.Left), FloatToString(b.Bottom), FloatToString(b.DX()), FloatToString(b.DY())))
 	}
 	buffer.WriteString("Q")
 	return nil

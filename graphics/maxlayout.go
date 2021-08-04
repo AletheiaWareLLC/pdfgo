@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Aletheia Ware LLC
+ * Copyright 2021 Aletheia Ware LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,9 +21,28 @@ import (
 	"github.com/AletheiaWareLLC/pdfgo"
 )
 
-type Box interface {
-	// Tells the Box to resize within the given bounds.
-	// Returns the actual bounds occupied.
-	SetBounds(bounds *Rectangle) (*Rectangle, error)
-	Write(p *pdfgo.PDF, buffer *bytes.Buffer) error
+type MaxLayout struct {
+	Boxes []Box
+}
+
+func (l *MaxLayout) Add(box Box) {
+	l.Boxes = append(l.Boxes, box)
+}
+
+func (l *MaxLayout) SetBounds(bounds *Rectangle) (*Rectangle, error) {
+	for _, b := range l.Boxes {
+		if _, err := b.SetBounds(bounds); err != nil {
+			return nil, err
+		}
+	}
+	return bounds, nil
+}
+
+func (l *MaxLayout) Write(p *pdfgo.PDF, buffer *bytes.Buffer) error {
+	for _, b := range l.Boxes {
+		if err := b.Write(p, buffer); err != nil {
+			return err
+		}
+	}
+	return nil
 }

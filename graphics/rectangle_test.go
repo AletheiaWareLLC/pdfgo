@@ -29,7 +29,7 @@ func TestRectangle_Width(t *testing.T) {
 		Bottom: 0,
 	}
 	expected := 10.0
-	actual := r.GetWidth()
+	actual := r.DX()
 	if expected != actual {
 		t.Errorf("Incorrect width; expected '%f', got '%f'", expected, actual)
 	}
@@ -43,7 +43,7 @@ func TestRectangle_Height(t *testing.T) {
 		Bottom: 0,
 	}
 	expected := 10.0
-	actual := r.GetHeight()
+	actual := r.DY()
 	if expected != actual {
 		t.Errorf("Incorrect height; expected '%f', got '%f'", expected, actual)
 	}

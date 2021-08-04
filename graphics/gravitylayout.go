@@ -18,7 +18,6 @@ package graphics
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"github.com/AletheiaWareLLC/pdfgo"
 )
@@ -43,32 +42,52 @@ func (l *GravityLayout) Add(box Box) {
 	l.Box = box
 }
 
-func (l *GravityLayout) SetBounds(bounds *Rectangle) error {
+func (l *GravityLayout) SetBounds(bounds *Rectangle) (*Rectangle, error) {
 	l.Left = bounds.Left
 	l.Top = bounds.Top
 	l.Right = bounds.Right
 	l.Bottom = bounds.Bottom
 	// Set bounds once to calculate width & height
-	if err := l.Box.SetBounds(bounds); err != nil {
-		return err
+	used, err := l.Box.SetBounds(bounds)
+	if err != nil {
+		return nil, err
 	}
+	var b *Rectangle
 	switch l.Gravity {
+	case North:
+		dx := (l.DX() - used.DX()) / 2
+		b = &Rectangle{
+			Left:   l.Left + dx,
+			Top:    l.Top,
+			Right:  l.Right - dx,
+			Bottom: l.Bottom,
+		}
 	case Middle:
-		dx := (l.GetWidth() - l.Box.GetWidth()) / 2
-		dy := (l.GetHeight() - l.Box.GetHeight()) / 2
-		// Set final bounds
-		if err := l.Box.SetBounds(&Rectangle{
+		dx := (l.DX() - used.DX()) / 2
+		dy := (l.DY() - used.DY()) / 2
+		b = &Rectangle{
 			Left:   l.Left + dx,
 			Top:    l.Top - dy,
 			Right:  l.Right - dx,
 			Bottom: l.Bottom + dy,
-		}); err != nil {
-			return err
+		}
+	case South:
+		dx := (l.DX() - used.DX()) / 2
+		dy := (l.DY() - used.DY())
+		b = &Rectangle{
+			Left:   l.Left + dx,
+			Top:    l.Top - dy,
+			Right:  l.Right - dx,
+			Bottom: l.Bottom,
 		}
 	default:
-		return errors.New(fmt.Sprintf("Gravity not implemented: %d", l.Gravity))
+		return nil, fmt.Errorf("Gravity not implemented: %d", l.Gravity)
 	}
-	return nil
+	// Set final bounds
+	if _, err := l.Box.SetBounds(b); err != nil {
+		return nil, err
+	}
+	return bounds, nil
 }
 
 func (l *GravityLayout) Write(p *pdfgo.PDF, buffer *bytes.Buffer) error {

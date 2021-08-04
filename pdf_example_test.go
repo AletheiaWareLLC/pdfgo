@@ -93,7 +93,7 @@ func ExamplePDF_stream_colourbox() {
 		FillColour:   []float64{0.0, 0.0, 1.0},
 	}
 
-	if err := box.SetBounds(&graphics.Rectangle{
+	if _, err := box.SetBounds(&graphics.Rectangle{
 		Left:   50,
 		Right:  350,
 		Top:    550,
@@ -301,14 +301,14 @@ func ExamplePDF_stream_textbox() {
 	// Create Contents
 	box := &graphics.TextBox{
 		Text:       []rune("Hello World!"),
-		FontId:     "F1",
+		FontID:     "F1",
 		Font:       f1,
 		FontSize:   32,
 		FontColour: []float64{1.0, 0.0, 0.0},
 		Align:      graphics.Center,
 	}
 
-	if err := box.SetBounds(&graphics.Rectangle{
+	if _, err := box.SetBounds(&graphics.Rectangle{
 		Left:   50,
 		Right:  350,
 		Top:    550,

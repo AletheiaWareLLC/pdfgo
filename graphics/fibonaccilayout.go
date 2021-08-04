@@ -30,29 +30,33 @@ func (l *FibonacciLayout) Add(box Box) {
 	l.Boxes = append(l.Boxes, box)
 }
 
-func (l *FibonacciLayout) SetBounds(bounds *Rectangle) error {
+func (l *FibonacciLayout) SetBounds(bounds *Rectangle) (*Rectangle, error) {
 	x := bounds.Left
 	y := bounds.Top
+	used := NegativeRectangle()
 	for i, b := range l.Boxes {
-		size := l.Sizes[i]
-		if err := b.SetBounds(&Rectangle{
+		s := l.Sizes[i]
+		size := &Rectangle{
 			Left:   x,
 			Top:    y,
-			Right:  x + size,
-			Bottom: y - size,
-		}); err != nil {
-			return err
+			Right:  x + s,
+			Bottom: y - s,
 		}
+		u, err := b.SetBounds(size)
+		if err != nil {
+			return nil, err
+		}
+		used = used.Max(u)
 		switch i % 2 {
 		case 0:
 			// Move Down
-			y -= size
+			y -= s
 		case 1:
 			// Move Right
-			x += size
+			x += s
 		}
 	}
-	return nil
+	return used, nil
 }
 
 func (l *FibonacciLayout) Write(p *pdfgo.PDF, buffer *bytes.Buffer) error {

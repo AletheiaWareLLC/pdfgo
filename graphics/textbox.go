@@ -50,29 +50,21 @@ type Line struct {
 
 type TextBox struct {
 	Text             []rune
-	FontId           string
+	FontID           string
 	Font             font.Font
 	FontSize         float64
 	FontColour       []float64
 	Align            Alignment
+	ShrinkToFit      bool
 	OriginX, OriginY float64
-	Width, Height    float64
 	Lines            []*Line
 }
 
-func (b *TextBox) AddLine(text []rune) {
-	b.AddMeasuredLine(text, b.Font.MeasureText(text, b.FontSize))
-}
-
-func (b *TextBox) AddMeasuredLine(text []rune, width float64) {
+func (b *TextBox) AddMeasuredLine(text []rune, width, delta float64) {
 	var indent float64
 	for _, l := range b.Lines {
 		indent += l.Indent
 	}
-	log.Println("NewLine:", len(text), string(text))
-	log.Println("TextWidth:", width)
-	delta := b.Width - width
-	log.Println("Delta:", delta)
 	var line *Line
 	switch b.Align {
 	case Center:
@@ -91,10 +83,7 @@ func (b *TextBox) AddMeasuredLine(text []rune, width float64) {
 	case Left:
 		line = newLeftLine(text, width, delta, indent)
 	}
-	log.Println("Indent:", line.Indent)
 	b.Lines = append(b.Lines, line)
-	b.Height += b.FontSize
-	log.Println("TextHeight:", b.Height)
 }
 
 func newLeftLine(text []rune, width, delta, indent float64) *Line {
@@ -148,8 +137,6 @@ func newJustifiedLine(text []rune, width, delta, indent float64, secondary Align
 			wordSpaces++
 		}
 	}
-	log.Println("Word Spaces:", wordSpaces)
-	log.Println("Character Spaces:", characterSpaces)
 	if wordSpaces > 1 {
 		line.WordSpacing = (delta / 2) / wordSpaces
 		line.CharacterSpacing = (delta / 2) / characterSpaces
@@ -158,44 +145,22 @@ func newJustifiedLine(text []rune, width, delta, indent float64, secondary Align
 		line.CharacterSpacing = (delta / 1) / characterSpaces
 		//line.HorizontalScaling += (delta / width) * 100
 	}
-	log.Println("Word Spacing:", line.WordSpacing)
-	log.Println("Character Spacing:", line.CharacterSpacing)
-	log.Println("Horizontal Scaling:", line.HorizontalScaling)
 	return line
 }
 
-func (b *TextBox) GetWidth() float64 {
-	return b.Width
-}
-
-func (b *TextBox) GetHeight() float64 {
-	return b.Height
-}
-
-func (b *TextBox) SetBounds(bounds *Rectangle) error {
+func (b *TextBox) SetBounds(bounds *Rectangle) (*Rectangle, error) {
 	b.OriginX = bounds.Left
-	log.Println("OriginX:", b.OriginX)
 	b.OriginY = bounds.Top - b.FontSize
-	log.Println("OriginY:", b.OriginY)
-	maxWidth := bounds.GetWidth()
-	log.Println("MaxWidth:", maxWidth)
-	b.Width = maxWidth
-	b.Height = 0
+	maxWidth := bounds.DX()
+	maxHeight := bounds.DY()
+
+	var height float64
 	b.Lines = nil
-	maxHeight := bounds.GetHeight()
-	log.Println("MaxHeight:", maxHeight)
 	for _, line := range SplitLines(b.Text) {
 		textWidth := b.Font.MeasureText(line, b.FontSize)
-		log.Println("TextWidth:", textWidth)
-		if textWidth > (maxWidth * 2) {
-			// Multiple Lines
-
-			// TODO consider splitting text into words and incrementally add to a list until the width is greater than maxWidth.
-			//  If the last word is short, remove from list and put on a new line.
-			//  If the last word is long, hyphenate.
-
-			// TODO design a backtracking algorithm to find the most efficient layout with least "badness"
-
+		delta := maxWidth - textWidth
+		if delta < 0 && !b.ShrinkToFit {
+			// Split line
 			wrappoint := -1
 			start := 0
 			end := 0
@@ -205,73 +170,69 @@ func (b *TextBox) SetBounds(bounds *Rectangle) error {
 					wrappoint = end
 				}
 				substring := line[start:end]
-				if c == '\n' {
-					log.Println("New Line Character:", end)
-					if b.Height+b.FontSize <= maxHeight {
-						b.AddLine(substring)
+				textWidth := b.Font.MeasureText(line[start:end+1], b.FontSize)
+				delta := maxWidth - textWidth
+				if delta < 0 {
+					if wrappoint == -1 {
+						if len(b.Lines) == 0 || height+b.FontSize <= maxHeight {
+							b.AddMeasuredLine(substring, textWidth, delta)
+							height += b.FontSize
+						} else {
+							log.Println("Cannot fit line:", string(substring))
+							break
+						}
+						end++
 					} else {
-						log.Println("Cannot fit line")
-						break
+						substring = line[start:wrappoint]
+						if len(b.Lines) == 0 || height+b.FontSize <= maxHeight {
+							b.AddMeasuredLine(substring, textWidth, delta)
+							height += b.FontSize
+						} else {
+							log.Println("Cannot fit line:", string(substring))
+							break
+						}
+						end = wrappoint + 1
 					}
-					end++
 					start = end
 					wrappoint = -1
 				} else {
-					textWidth := b.Font.MeasureText(line[start:end+1], b.FontSize)
-					if textWidth > maxWidth {
-						if wrappoint == -1 {
-							log.Println("Hard break:", start, end)
-							if b.Height+b.FontSize <= maxHeight {
-								b.AddLine(substring)
-							} else {
-								log.Println("Cannot fit line")
-								break
-							}
-							end++
-						} else {
-							log.Println("Break at wrap point:", start, wrappoint)
-							substring = line[start:wrappoint]
-							if b.Height+b.FontSize <= maxHeight {
-								b.AddLine(substring)
-							} else {
-								log.Println("Cannot fit line")
-								break
-							}
-							end = wrappoint + 1
-						}
-						start = end
-						wrappoint = -1
-					} else {
-						end++
-					}
+					end++
 				}
 			}
-			if end-start > 0 && b.Height+b.FontSize <= maxHeight {
-				b.AddLine(line[start:end])
+			if end-start > 0 && height+b.FontSize <= maxHeight {
+				substring := line[start:end]
+				textWidth := b.Font.MeasureText(substring, b.FontSize)
+				delta := maxWidth - textWidth
+				b.AddMeasuredLine(substring, textWidth, delta)
+				height += b.FontSize
 			}
 		} else {
-			// Single Line
-			for textWidth > maxWidth {
+			// Shrink To Fit
+			for delta < 0 {
 				b.FontSize--
-				log.Println("FontSize:", b.FontSize)
 				b.OriginY = bounds.Top - b.FontSize
-				log.Println("OriginY:", b.OriginY)
 				textWidth = b.Font.MeasureText(line, b.FontSize)
-				log.Println("TextWidth:", textWidth)
+				delta = maxWidth - textWidth
 			}
-			if b.Height+b.FontSize <= maxHeight {
-				b.AddMeasuredLine(line, textWidth)
+			if len(b.Lines) == 0 || height+b.FontSize <= maxHeight {
+				b.AddMeasuredLine(line, textWidth, delta)
+				height += b.FontSize
 			} else {
-				log.Println("Cannot fit line")
+				log.Println("Cannot fit line", string(line))
 			}
 		}
 	}
-	return nil
+	return &Rectangle{
+		Left:   bounds.Left,
+		Right:  bounds.Right,
+		Top:    bounds.Top,
+		Bottom: bounds.Top - height,
+	}, nil
 }
 
 func (b *TextBox) Write(p *pdfgo.PDF, buffer *bytes.Buffer) error {
 	buffer.WriteString("q\nBT\n")
-	buffer.WriteString(fmt.Sprintf("/%s %s Tf\n", b.FontId, FloatToString(b.FontSize)))
+	buffer.WriteString(fmt.Sprintf("/%s %s Tf\n", b.FontID, FloatToString(b.FontSize)))
 	buffer.WriteString(fmt.Sprintf("%s %s %s rg\n", FloatToString(b.FontColour[0]), FloatToString(b.FontColour[1]), FloatToString(b.FontColour[2])))
 	buffer.WriteString(fmt.Sprintf("1 0 0 1 %s %s Tm\n", FloatToString(b.OriginX), FloatToString(b.OriginY)))
 	buffer.WriteString(fmt.Sprintf("%s TL\n", FloatToString(b.FontSize)))
@@ -282,7 +243,7 @@ func (b *TextBox) Write(p *pdfgo.PDF, buffer *bytes.Buffer) error {
 		buffer.WriteString(fmt.Sprintf("%s 0 Td\n", FloatToString(l.Indent)))
 		buffer.WriteString(fmt.Sprintf("%s Ts\n", FloatToString(l.Rise)))
 		buffer.WriteString(fmt.Sprintf("%d Tr\n", l.Render))
-		if i == 0 {
+		if i == 0 { // TODO try with UTF-16BE
 			buffer.WriteString(fmt.Sprintf("(%s) Tj\n", l.Text))
 		} else {
 			buffer.WriteString(fmt.Sprintf("(%s) '\n", l.Text))

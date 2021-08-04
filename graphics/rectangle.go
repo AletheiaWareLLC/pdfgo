@@ -16,18 +16,39 @@
 
 package graphics
 
-import "strconv"
+import (
+	"math"
+	"strconv"
+)
 
 type Rectangle struct {
 	Left, Right, Top, Bottom float64
 }
 
-func (r *Rectangle) GetWidth() float64 {
+func (r *Rectangle) DX() float64 {
 	return r.Right - r.Left
 }
 
-func (r *Rectangle) GetHeight() float64 {
+func (r *Rectangle) DY() float64 {
 	return r.Top - r.Bottom
+}
+
+func (r *Rectangle) Max(o *Rectangle) *Rectangle {
+	return &Rectangle{
+		Left:   math.Min(r.Left, o.Left),
+		Right:  math.Max(r.Right, o.Right),
+		Top:    math.Max(r.Top, o.Top),
+		Bottom: math.Min(r.Bottom, o.Bottom),
+	}
+}
+
+func NegativeRectangle() *Rectangle {
+	return &Rectangle{
+		Left:   math.MaxFloat64,
+		Right:  -math.MaxFloat64,
+		Top:    -math.MaxFloat64,
+		Bottom: math.MaxFloat64,
+	}
 }
 
 func FloatToString(f float64) string {

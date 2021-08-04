@@ -18,7 +18,6 @@ package graphics
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"github.com/AletheiaWareLLC/pdfgo"
 )
@@ -34,45 +33,63 @@ const (
 
 type ListLayout struct {
 	Rectangle
-	Direction Direction
-	Padding   float64
-	Boxes     []Box
+	Direction      Direction
+	Padding        float64
+	Boxes          []Box
+	MinimumVisible int
+	Visible        int
 }
 
 func (l *ListLayout) Add(box Box) {
 	l.Boxes = append(l.Boxes, box)
 }
 
-func (l *ListLayout) SetBounds(bounds *Rectangle) error {
-	l.Left = bounds.Left
-	l.Top = bounds.Top
-	l.Right = bounds.Right
-	l.Bottom = bounds.Bottom
+func (l *ListLayout) SetBounds(bounds *Rectangle) (*Rectangle, error) {
 	left := bounds.Left
 	top := bounds.Top
 	right := bounds.Right
 	bottom := bounds.Bottom
+	used := NegativeRectangle()
+	l.Visible = 0
 	switch l.Direction {
 	case TopBottom:
 		for _, b := range l.Boxes {
-			if err := b.SetBounds(&Rectangle{
+			u, err := b.SetBounds(&Rectangle{
 				Left:   left,
 				Top:    top,
 				Right:  right,
 				Bottom: bottom,
-			}); err != nil {
-				return err
+			})
+			if err != nil {
+				return nil, err
 			}
-			top -= b.GetHeight() + l.Padding
+			top -= u.DY()
+			if top < bottom {
+				break
+			}
+			l.Visible += 1
+			used = used.Max(u)
+			top -= l.Padding
 		}
 	default:
-		return errors.New(fmt.Sprintf("Direction not implemented: %d", l.Direction))
+		return nil, fmt.Errorf("Direction not implemented: %d", l.Direction)
 	}
-	return nil
+	if l.Visible < l.MinimumVisible {
+		l.Visible = 0
+		return bounds, nil
+	}
+	l.Left = used.Left
+	l.Top = used.Top
+	l.Right = used.Right
+	l.Bottom = used.Bottom
+	return used, nil
 }
 
 func (l *ListLayout) Write(p *pdfgo.PDF, buffer *bytes.Buffer) error {
-	for _, b := range l.Boxes {
+	for i, b := range l.Boxes {
+		if i >= l.Visible {
+			break
+		}
 		if err := b.Write(p, buffer); err != nil {
 			return err
 		}
